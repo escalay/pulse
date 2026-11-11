@@ -1,4 +1,5 @@
 /** The routes: reports in, the public totals out, and the full numbers for whoever Cloudflare Access lets through. */
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { type AccessSettings, allowed } from './access.js'
 import type { Store } from './db.js'
@@ -6,6 +7,7 @@ import { ingest } from './ingest.js'
 import { dashboard, home, numbers } from './pages.js'
 import { products } from './products/index.js'
 import { publicOf, statsOf } from './stats.js'
+import { releases } from './tables.js'
 
 const MINUTE = 60 * 1000
 const PER_MINUTE = 20
@@ -35,6 +37,16 @@ export const createApp = (store: Store, settings: AccessSettings & { GIT_SHA?: s
     const sender = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
     if (!within(sender)) return c.text('Too many reports; one a day is enough', 429)
     return ingest(c.req.raw, store, c.req.param('product'))
+  })
+
+  // The update check: no report, no instance id, so it works for an instance with telemetry off
+  app.get('/v1/:product/latest', async (c) => {
+    const name = c.req.param('product')
+    if (!products[name]) return c.text('Not found', 404)
+    const sender = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
+    if (!within(sender)) return c.text('Too many requests; once a day is enough', 429)
+    const [release] = await store.db.select({ latest: releases.latest }).from(releases).where(eq(releases.product, name))
+    return c.json({ latest: release?.latest ?? null }, 200, { 'cache-control': 'public, max-age=300' })
   })
 
   app.get('/', () => home())

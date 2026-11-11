@@ -32,6 +32,7 @@ Yardhand's fields: [`src/products/yardhand.ts`](src/products/yardhand.ts), expla
 | Path | Who | What |
 |---|---|---|
 | `POST /v1/<product>` | instances | Takes a report; answers `{ "ok": true, "latest": "1.2.3" }` with the newest release |
+| `GET /v1/<product>/latest` | instances | The newest release, `{ "latest": "1.2.3" }`: the update check. It takes no report and no id |
 | `/<product>` and `/<product>.json` | anyone | Totals only: active instances, versions, countries. No group smaller than five is shown |
 | `/admin/<product>` and `.json` | the maintainers, through Cloudflare Access | Activity, the setup funnel, retention, every field |
 
