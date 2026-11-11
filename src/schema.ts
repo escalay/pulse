@@ -6,10 +6,18 @@
 export type Field = { values: readonly string[] } | 'flag'
 
 export type Product = {
-  /** The GitHub repository releases come from (`owner/name`), for the "a newer version is out" answer. */
+  /** As people say it. */
+  title: string
+  /** The GitHub repository releases come from (`owner/name`): the newest release, its downloads and the stars. */
   repo: string
   schemas: Record<number, Record<string, Field>>
+  /** Setup steps in order, each a field that is reached once it is true or more than nothing. The last is "activated". */
+  funnel: { label: string; field: string }[]
 }
+
+/** Whether a field's value says "this happened": true, or a range above nothing. */
+export const reached = (value: string | boolean | undefined) =>
+  value === true || (typeof value === 'string' && value !== '0' && value !== 'off')
 
 /** One of a fixed list of labels. */
 export const choice = (...values: string[]): Field => ({ values })

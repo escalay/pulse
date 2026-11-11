@@ -2,7 +2,15 @@
 import { choice, count, days, flag, type Product } from '../schema.js'
 
 export const yardhand: Product = {
+  title: 'Yardhand',
   repo: 'escalay/yardhand',
+  funnel: [
+    { label: 'Claimed by an owner', field: 'claimed' },
+    { label: 'Connected a server', field: 'connections' },
+    { label: 'Has tools', field: 'tools' },
+    { label: 'Made a client key', field: 'clients_key' },
+    { label: 'Made a call', field: 'calls' },
+  ],
   schemas: {
     1: {
       // Where it runs

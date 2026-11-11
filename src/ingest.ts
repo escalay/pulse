@@ -1,6 +1,6 @@
 /**
  * `POST /v1/<product>`: one report from one instance. The day and the country are set here, never by the sender; the
- * sender's address is not read. A second report on the same day replaces the first, so sending twice is harmless.
+ * sender's address is not kept. A second report on the same day replaces the first, so sending twice is harmless.
  */
 import { products } from './products/index.js'
 import { read } from './schema.js'
