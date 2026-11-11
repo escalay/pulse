@@ -103,7 +103,11 @@ jobs:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
         run: |
-          curl -fsS -o /dev/null -H "Authorization: Bearer $DEPLOY_TOKEN" "$DEPLOY_URL"
+          answer=$(curl -fsS -X POST -H "Authorization: Bearer $DEPLOY_TOKEN" "$DEPLOY_URL")
+          if ! printf '%s' "$answer" | grep -q queued; then
+            echo "::error::The server did not queue a deployment"
+            exit 1
+          fi
       - name: Wait until the live server answers with this commit
         env:
           HEALTH_URL: ${{ vars.HEALTH_URL }}
