@@ -22,7 +22,10 @@ const keysOf = async (team: string) => {
   return byId
 }
 
-export const allowed = async (request: Request, env: Env) => {
+/** The Zero Trust team, the Access application's audience tag, and `local` to open the pages on a developer's machine. */
+export type AccessSettings = { ACCESS_TEAM?: string; ACCESS_AUD?: string; ADMIN_OPEN?: string }
+
+export const allowed = async (request: Request, env: AccessSettings) => {
   if (env.ADMIN_OPEN === 'local') return true
   if (!env.ACCESS_TEAM || !env.ACCESS_AUD) return false
   const [head, body, signature] = (request.headers.get('cf-access-jwt-assertion') ?? '').split('.')

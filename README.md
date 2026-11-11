@@ -1,18 +1,19 @@
 # Pulse
 
-Anonymous usage reports from self-hosted Escalay products, kept in one small Cloudflare Worker. A product's instances
+Anonymous usage reports from self-hosted Escalay products, kept by one small server: a single container with a
+SQLite file. A product's instances
 send one report a day: ranges and yes/no answers that say how far setup got and what is used. This repository is the
 whole receiving end, so anyone can read what is accepted and what is kept.
 
 ## What is kept
 
-- **One row per instance per day**: the product, a random instance id, the day, the version, the country Cloudflare
-  saw the request come from, and the report's fields. A second report on the same day replaces the first.
+- **One row per instance per day**: the product, a random instance id, the day, the version, the country the
+  request came from, and the report's fields. A second report on the same day replaces the first.
 - **One row per instance**: when it was first and last seen, and its first and current version.
 - **Public numbers** fetched once a day from GitHub: stars and release downloads.
 
-Not kept: the sender's address (it counts requests for one minute to stop floods, and is never written), request
-logs (they are off in the deploy config), host names, user names, or anything a report's schema does not name.
+The tables hold nothing else: no host name, no user, and nothing a report's schema does not name.
+[`migrations/`](migrations) is the whole of it.
 
 Daily rows are kept 13 months. Older months become totals ("this many instances had this value") with no instance
 id, and the rows and lapsed instances are deleted.
@@ -51,12 +52,25 @@ Yardhand's fields: [`src/products/yardhand.ts`](src/products/yardhand.ts), expla
 
 ```sh
 pnpm install
-pnpm gate                 # types and tests, inside the Workers runtime
-pnpm dev                  # http://localhost:8787, with a local database
+pnpm gate                 # types and tests
+pnpm dev                  # http://localhost:8787, with its database in .data/
 ```
 
-`wrangler.example.jsonc` is the deploy config without the account's ids. To see the private pages locally, put
-`ADMIN_OPEN=local` in `.dev.vars`.
+Or as the container the project itself runs:
+
+```sh
+docker run -p 3000:3000 -v pulse-data:/data ghcr.io/escalay/pulse:latest
+```
+
+| Setting | What it does |
+|---|---|
+| `PORT` | Where it listens. The image sets 3000 |
+| `DATA_DIR` | Where `pulse.sqlite` lives. The image sets `/data`: mount a volume there |
+| `ACCESS_TEAM`, `ACCESS_AUD` | The Cloudflare Zero Trust team and Access application that may open `/admin`. Unset, `/admin` doesn't exist |
+| `ADMIN_OPEN=local` | Opens `/admin` with no sign-in, for a developer's machine only |
+
+It is Node, [Hono](https://hono.dev), SQLite (`node:sqlite`) and [Drizzle](https://orm.drizzle.team). Opening the
+database applies whatever in `migrations/` it has not seen.
 
 ## License
 

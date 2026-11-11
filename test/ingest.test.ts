@@ -1,9 +1,10 @@
-import { env } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
+import { openStore } from '../src/db.js'
 import { ingest } from '../src/ingest.js'
 import { products } from '../src/products/index.js'
 import type { Field } from '../src/schema.js'
 
+const store = openStore(':memory:')
 const INSTANCE = '3f0c1a52-7b1e-4c7a-9d53-0a6f1b2c3d4e'
 
 /** A report with the first allowed value of every field of the product's schema. */
@@ -28,14 +29,14 @@ const send = (payload: unknown, at = '2026-11-12T08:00:00Z', product = 'yardhand
     new Request(`https://pulse.example.test/v1/${product}`, {
       method: 'POST',
       body: typeof payload === 'string' ? payload : JSON.stringify(payload),
-      cf: { country: 'DE' } as never,
+      headers: { 'cf-ipcountry': 'DE' },
     }),
-    env,
+    store,
     product,
     new Date(at),
   )
 
-const rows = (sql: string) => env.DB.prepare(sql).all<Record<string, unknown>>().then(({ results }) => results)
+const rows = (sql: string) => store.query<Record<string, unknown>>(sql)
 
 describe('a report', () => {
   it('is kept once a day per instance, with the day and country set here', async () => {
@@ -54,7 +55,7 @@ describe('a report', () => {
 
   it('is answered with the newest release once one is known', async () => {
     expect(await (await send(body())).json()).toEqual({ ok: true, latest: null })
-    await env.DB.exec("insert into releases values ('yardhand', '0.4.0', '2026-11-12T00:00:00Z')")
+    store.run("insert into releases values ('yardhand', '0.4.0', '2026-11-12T00:00:00Z')")
     expect(await (await send(body())).json()).toEqual({ ok: true, latest: '0.4.0' })
   })
 

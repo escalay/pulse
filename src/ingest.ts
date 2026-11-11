@@ -1,16 +1,19 @@
 /**
- * `POST /v1/<product>`: one report from one instance. The day and the country are set here, never by the sender; the
- * sender's address is not kept. A second report on the same day replaces the first, so sending twice is harmless.
+ * `POST /v1/<product>`: one report from one instance. The day and the country are set here, never by the sender. A
+ * second report on the same day replaces the first, so sending twice is harmless.
  */
+import { eq } from 'drizzle-orm'
+import type { Store } from './db.js'
 import { products } from './products/index.js'
 import { read } from './schema.js'
+import { instances, releases, reports } from './tables.js'
 
 const MAX_BYTES = 4096
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
-export const ingest = async (request: Request, env: Env, name: string, now = new Date()) => {
+export const ingest = async (request: Request, { db }: Pick<Store, 'db'>, name: string, now = new Date()) => {
   const product = products[name]
   if (!product) return json(404, { problems: ['No such product'] })
   const text = await request.text()
@@ -26,17 +29,28 @@ export const ingest = async (request: Request, env: Env, name: string, now = new
 
   const { report } = result
   const day = now.toISOString().slice(0, 10)
-  const country = /^[A-Z]{2}$/.test(String(request.cf?.country ?? '')) ? String(request.cf?.country) : 'XX'
-  const [, , latest] = await env.DB.batch<{ latest: string }>([
-    env.DB.prepare(
-      `insert into reports (product, instance, day, schema, version, country, fields) values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-       on conflict (product, instance, day) do update set schema = ?4, version = ?5, country = ?6, fields = ?7`,
-    ).bind(name, report.instance, day, report.schema, report.version, country, JSON.stringify(report.fields)),
-    env.DB.prepare(
-      `insert into instances (product, instance, first_day, last_day, first_version, version) values (?1, ?2, ?3, ?3, ?4, ?4)
-       on conflict (product, instance) do update set last_day = ?3, version = ?4`,
-    ).bind(name, report.instance, day, report.version),
-    env.DB.prepare('select latest from releases where product = ?1').bind(name),
-  ])
-  return json(200, { ok: true, latest: latest?.results[0]?.latest ?? null })
+  // The country Cloudflare saw the request come from, when it passed through Cloudflare
+  const seen = request.headers.get('cf-ipcountry') ?? ''
+  const country = /^[A-Z]{2}$/.test(seen) ? seen : 'XX'
+  const row = { schema: report.schema, version: report.version, country, fields: JSON.stringify(report.fields) }
+  await db
+    .insert(reports)
+    .values({ product: name, instance: report.instance, day, ...row })
+    .onConflictDoUpdate({ target: [reports.product, reports.instance, reports.day], set: row })
+  await db
+    .insert(instances)
+    .values({
+      product: name,
+      instance: report.instance,
+      firstDay: day,
+      lastDay: day,
+      firstVersion: report.version,
+      version: report.version,
+    })
+    .onConflictDoUpdate({
+      target: [instances.product, instances.instance],
+      set: { lastDay: day, version: report.version },
+    })
+  const [release] = await db.select({ latest: releases.latest }).from(releases).where(eq(releases.product, name))
+  return json(200, { ok: true, latest: release?.latest ?? null })
 }

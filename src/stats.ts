@@ -2,6 +2,7 @@
  * The numbers behind both pages, per product: who is active, how far they got, what they run. Everything counts
  * instances by the last report each sent in the window, so an instance is one vote however often it reported.
  */
+import type { Store } from './db.js'
 import { type Product, reached } from './schema.js'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -20,14 +21,9 @@ const tally = (values: string[]): Tally => {
   return [...counts].map(([label, instances]) => ({ label, instances })).sort((a, b) => b.instances - a.instances)
 }
 
-export const statsOf = async (db: D1Database, name: string, product: Product, now = new Date()) => {
-  const all = <Row>(query: string, ...values: unknown[]) =>
-    db
-      .prepare(query)
-      .bind(...values)
-      .all<Row>()
-      .then(({ results }) => results)
-  const [latest, week, daily, firsts, cohorts, milestone, outside] = await Promise.all([
+export const statsOf = ({ query }: Pick<Store, 'query'>, name: string, product: Product, now = new Date()) => {
+  const all = query
+  const [latest, week, daily, firsts, cohorts, milestone, outside] = [
     all<{ version: string; country: string; fields: string }>(
       `select r.version, r.country, r.fields from reports r
        join (select instance, max(day) as day from reports where product = ?1 and day >= ?2 group by instance) last
@@ -71,7 +67,7 @@ export const statsOf = async (db: D1Database, name: string, product: Product, no
       'select day, stars, downloads from outside where product = ?1 order by day desc limit 30',
       name,
     ),
-  ])
+  ] as const
 
   const reports = latest.map((row) => ({ ...row, fields: JSON.parse(row.fields) as Record<string, string | boolean> }))
   const schema = Object.values(product.schemas).at(-1) ?? {}
@@ -131,7 +127,7 @@ export const statsOf = async (db: D1Database, name: string, product: Product, no
   }
 }
 
-export type Stats = Awaited<ReturnType<typeof statsOf>>
+export type Stats = ReturnType<typeof statsOf>
 
 const FEWEST = 5
 /**
