@@ -33,3 +33,17 @@ describe('the update check', () => {
     expect(asks.some((response) => response.status === 429)).toBe(true)
   })
 })
+
+describe('the hourly look outside', () => {
+  it('learns of a new release the next hour, not the next day', async () => {
+    const { hourly } = await import('../src/daily.js')
+    const github = (async (url: string) =>
+      Response.json(
+        String(url).endsWith('/releases?per_page=100')
+          ? [{ tag_name: 'v0.4.0', draft: false, prerelease: false, assets: [] }]
+          : { stargazers_count: 3 },
+      )) as typeof fetch
+    await hourly(store, new Date('2026-11-12T09:00:00Z'), github)
+    expect(store.query("select latest from releases where product = 'yardhand'")).toEqual([{ latest: '0.4.0' }])
+  })
+})

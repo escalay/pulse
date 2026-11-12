@@ -87,8 +87,12 @@ export const rollUp = (store: Pick<Store, 'query' | 'run' | 'together'>, now: Da
   return month
 }
 
-export const daily = async (store: Store, now = new Date()) => {
+/** Every hour: each product's stars, downloads and newest release, so an instance hears of a release within the hour. */
+export const hourly = async (store: Store, now = new Date(), fetchImpl = fetch) => {
   for (const [name, product] of Object.entries(products))
-    await fetchOutside(store, name, product.repo, now).catch((error) => console.warn(`outside ${name}: ${error}`))
-  return rollUp(store, now)
+    await fetchOutside(store, name, product.repo, now, fetchImpl).catch((error) =>
+      console.warn(`outside ${name}: ${error}`),
+    )
 }
+
+export const daily = async (store: Store, now = new Date()) => rollUp(store, now)

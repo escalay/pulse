@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { serve } from '@hono/node-server'
 import { createApp } from './app.js'
-import { daily } from './daily.js'
+import { daily, hourly } from './daily.js'
 import { openStore } from './db.js'
 
 const dataDir = process.env.DATA_DIR ?? '.data'
@@ -20,7 +20,10 @@ const tick = async () => {
   await daily(store)
   store.run("insert into migrations values ('daily', ?1) on conflict (name) do update set at = ?1", today)
 }
-const run = () => void tick().catch((error) => console.warn(`daily: ${error}`))
+const run = () =>
+  void hourly(store)
+    .then(tick)
+    .catch((error) => console.warn(`daily: ${error}`))
 setTimeout(run, 30_000).unref()
 setInterval(run, HOUR).unref()
 
