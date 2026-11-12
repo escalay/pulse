@@ -93,3 +93,21 @@ describe('a report', () => {
     expect((await send(body(), undefined, 'unknown')).status).toBe(404)
   })
 })
+
+describe('a Mailroom report', () => {
+  const mailroomBody = (report: Record<string, unknown> = reportOf('mailroom', 1)) => ({
+    schema: 1,
+    instance: '9b2d4f61-1c3e-4a5b-8c7d-6e5f4a3b2c1d',
+    version: '0.4.0',
+    report,
+  })
+
+  it('is kept when it has every field of schema 1', async () => {
+    expect((await send(mailroomBody(), '2026-11-12T08:00:00Z', 'mailroom')).status).toBe(200)
+  })
+
+  it('is refused with a field its schema does not name', async () => {
+    const response = await send(mailroomBody({ ...reportOf('mailroom', 1), address_names: 'x' }), '2026-11-12T08:00:00Z', 'mailroom')
+    expect(response.status).toBe(400)
+  })
+})
